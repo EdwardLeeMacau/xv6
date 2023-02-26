@@ -45,8 +45,50 @@ void test1() {
     mkd("a/10");
 }
 
+void test2() {
+    mkd("p");
+    mkd("p/q");
+    mkd("p/q/p");
+    mkd("p/q/p/q");
+    mkd("p/q/p/q/p");
+}
+
+void test3() {
+    mkd("abcdefghij");
+    mkd("abcdefghij/klmnopqrst");
+    mkd("abcdefghij/klmnopqrst/abcdefghij");
+    mkd("abcdefghij/klmnopqrst/abcdefghij/klmnopqrst");
+    mkd("abcdefghij/klmnopqrst/abcdefghij/klmnopqrst/abcdefghij");
+}
+
+void test4() {
+    mkd("xxxxxxxxxx");
+    mkd("xxxxxxxxxx/yyyyyyyyyy");
+    mkd("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx");
+    mkd("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy");
+    mkd("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/bbbbbbbbbb");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/hhhhhhhhhh");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/tttttttttt");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/mmmmmmmmmm");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/rrrrrrrrrr");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/cccccccccc");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/ffffffffff");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/gggggggggg");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/kkkkkkkkkk");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/uuuuuuuuuu");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy/aaaaaaaaaa");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy/oooooooooo");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy/pppppppppp");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy/ssssssssss");
+    mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy/zzzzzzzzzz");
+}
+
 int main(int argc, char *argv[]) {
     test0();
     test1();
+    test2();
+    test3();
+    test4();
     exit(0);
 }
