@@ -10,8 +10,8 @@ occurrence(const char *str, char c)
     const char *p = str;
     int cnt = 0;
 
-    while ((p = strchr(p, c))) {
-        ++cnt; ++p;
+    while (*p) {
+        cnt += (*p++ == c);
     }
 
     return cnt;
@@ -90,11 +90,23 @@ main(int argc, char *argv[])
     const char * const dirname = argv[1];
     const char key = *argv[2];
     int ans = 0, pid = 0;
+    int pipe_fds[2];
+
+    // Open pipe. Parent is reader and child is writer.
+    if (pipe(pipe_fds) != 0) {
+        fprintf(2, "Failed to open pipe.\n"); exit(0);
+    }
 
     // fork a process.
     pid = fork();
     if (pid != 0) {
-        // * TODO: The parent process reads the integers from the pipe and prints
+        close(pipe_fds[1]); pipe_fds[1] = -1;
+
+        if (read(pipe_fds[0], &ans, sizeof(ans)) != sizeof(ans)) {
+            fprintf(2, "Unexpected read() result.\n");
+        }
+        close(pipe_fds[0]); pipe_fds[0] = -1;
+        printf("\n%d directories, %d files\n", (ans >> 16) ? ((ans >> 16) - 1) : 0, ans & 0xFFFF);
         wait(0); exit(0);
     }
 
@@ -108,10 +120,14 @@ main(int argc, char *argv[])
     // <root directory> contains one or more “/”, then you should keep all, append a “/”, and then append
     // the name of the sub-directory. Sample outputs are provided in Section 5.5.
     // However, if the <root directory> does not exist or is not a directory, you should print the following line:
+    close(pipe_fds[0]); pipe_fds[0] = -1;
     ans = tree(dirname, key);
-    printf("\n%d directories, %d files\n", (ans >> 16) ? ((ans >> 16) - 1) : 0, ans & 0xFFFF);
 
     // Sends two integers, file_num and dir_num, to parent.
+    if (write(pipe_fds[1], &ans, sizeof(ans)) != sizeof(ans)) {
+        fprintf(2, "Unexpected write() result.\n");
+    }
 
+    close(pipe_fds[1]); pipe_fds[1] = -1;
     exit(0);
 }
