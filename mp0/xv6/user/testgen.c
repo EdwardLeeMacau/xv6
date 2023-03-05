@@ -84,11 +84,48 @@ void test4() {
     mkfile("xxxxxxxxxx/yyyyyyyyyy/xxxxxxxxxx/yyyyyyyyyy/zzzzzzzzzz");
 }
 
+void test5() {
+    mkd("alongpathh");
+    mkfile("alongpathh/a"); // 3
+    mkd("alongpathh/1");
+    mkd("alongpathh/2");
+    mkd("alongpathh/3");
+    mkd("alongpathh/longlongll");
+
+}
+
+void test6() {
+    mkd("deep0");
+    mkd("deep0/1");
+    mkd("deep0/1/2");
+    mkd("deep0/1/2/3");
+    mkd("deep0/1/2/3/4");
+
+    mkd("deep0/a");
+    mkd("deep0/a/aa");
+    mkd("deep0/a/aa/aaa");
+    mkd("deep0/a/aa/aaa/aaaa");
+    mkd("deep0/a/bb");
+    mkd("deep0/a/bb/bbb");
+    mkd("deep0/a/bb/bbb/bbbb");
+    mkd("deep0/a/bb/ccc");
+    mkd("deep0/a/bb/ccc/ccccc");
+    mkd("deep0/a/bb/ccc/1");
+    mkd("deep0/a/bb/ccc/2");
+    mkd("deep0/a/bb/ccc/3");
+    mkd("deep0/a/bb/ccc/4");
+    mkd("deep0/a/bb/ccc/5");
+    mkfile("deep0/a/bb/ccc/f1");
+    mkfile("deep0/a/bb/ccc/f2");
+}
+
 int main(int argc, char *argv[]) {
     test0();
     test1();
     test2();
     test3();
     test4();
+    test5();
+    test6();
     exit(0);
 }

@@ -117,6 +117,84 @@ def test_mp0_5():
         '11 directories, 0 files',
     )
 
+@test(1, "mp0 command with franky testcase 1 (long dir file name)")
+def test_mp0_6():
+    r.run_qemu(shell_script([
+        'mp0 alongpathh a',
+    ]))
+    r.match(
+        'alongpathh 2',
+        'alongpathh/a 3',
+        'alongpathh/1 2',
+        'alongpathh/2 2',
+        'alongpathh/3 2',
+        'alongpathh/longlongll 2',
+        '',
+        '4 directories, 1 files',
+    )
+
+@test(1, "mp0 command with franky testcase 2 (deep struct)")
+def test_mp0_7():
+    r.run_qemu(shell_script([
+        'mp0 deep0 e',
+    ]))
+    r.match(
+        'deep0 2',
+        'deep0/1 2',
+        'deep0/1/2 2',
+        'deep0/1/2/3 2',
+        'deep0/1/2/3/4 2',
+        'deep0/a 2',
+        'deep0/a/aa 2',
+        'deep0/a/aa/aaa 2',
+        'deep0/a/aa/aaa/aaaa 2',
+        'deep0/a/bb 2',
+        'deep0/a/bb/bbb 2',
+        'deep0/a/bb/bbb/bbbb 2',
+        'deep0/a/bb/ccc 2',
+        'deep0/a/bb/ccc/ccccc 2',
+        'deep0/a/bb/ccc/1 2',
+        'deep0/a/bb/ccc/2 2',
+        'deep0/a/bb/ccc/3 2',
+        'deep0/a/bb/ccc/4 2',
+        'deep0/a/bb/ccc/5 2',
+        'deep0/a/bb/ccc/f1 2',
+        'deep0/a/bb/ccc/f2 2',
+        '',
+        '18 directories, 2 files',
+    )
+
+@test(1, "mp0 command with franky testcase 3 (deep struct)")
+def test_mp0_8():
+    r.run_qemu(shell_script([
+        'mp0 deep0 c',
+    ]))
+    r.match(
+        'deep0 0',
+        'deep0/1 0',
+        'deep0/1/2 0',
+        'deep0/1/2/3 0',
+        'deep0/1/2/3/4 0',
+        'deep0/a 0',
+        'deep0/a/aa 0',
+        'deep0/a/aa/aaa 0',
+        'deep0/a/aa/aaa/aaaa 0',
+        'deep0/a/bb 0',
+        'deep0/a/bb/bbb 0',
+        'deep0/a/bb/bbb/bbbb 0',
+        'deep0/a/bb/ccc 3',
+        'deep0/a/bb/ccc/ccccc 8',
+        'deep0/a/bb/ccc/1 3',
+        'deep0/a/bb/ccc/2 3',
+        'deep0/a/bb/ccc/3 3',
+        'deep0/a/bb/ccc/4 3',
+        'deep0/a/bb/ccc/5 3',
+        'deep0/a/bb/ccc/f1 3',
+        'deep0/a/bb/ccc/f2 3',
+        '',
+        '18 directories, 2 files',
+    )
+
 @test(1, "mp0 command with self-implemented testcase 0")
 def test_mp0_private_0():
     r.run_qemu(shell_script([
