@@ -1,0 +1,9 @@
+*.[do]
+*.asm
+*.sym
+*.out
+*.csv
+__pycache__
+kernel/kernel
+initcode
+**.pyc
