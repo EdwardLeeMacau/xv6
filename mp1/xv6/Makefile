@@ -28,12 +28,12 @@ OBJS = \
   $K/sysfile.o \
   $K/kernelvec.o \
   $K/plic.o \
-  $K/virtio_disk.o 
+  $K/virtio_disk.o
 
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
-#TOOLPREFIX = 
+#TOOLPREFIX =
 
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
@@ -75,7 +75,7 @@ endif
 LDFLAGS = -z max-page-size=4096
 
 $K/kernel: $(OBJS) $K/kernel.ld $U/initcode
-	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) 
+	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS)
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
 
@@ -116,6 +116,11 @@ $U/_mp1-part1-0: $U/mp1-part1-0.o $(LLIB)
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
 $U/_mp1-part1-1: $U/mp1-part1-1.o $(LLIB)
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+	$(OBJDUMP) -S $@ > $*.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
+
+$U/_mp1-part1-2: $U/mp1-part1-2.o $(LLIB)
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
@@ -167,6 +172,7 @@ UPROGS=\
 	$U/_threads\
 	$U/_mp1-part1-0\
 	$U/_mp1-part1-1\
+	$U/_mp1-part1-2\
 	$U/_mp1-part2-0\
 	$U/_mp1-part2-1\
 	$U/_mp1-part2-2\
@@ -176,7 +182,7 @@ fs.img: mkfs/mkfs README $(UPROGS)
 
 -include kernel/*.d user/*.d
 
-clean: 
+clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
 	$U/initcode $U/initcode.out $K/kernel fs.img \

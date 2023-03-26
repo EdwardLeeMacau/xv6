@@ -7,3 +7,7 @@ __pycache__
 kernel/kernel
 initcode
 **.pyc
+_*
+mkfs
+*.img
+user/usys.S

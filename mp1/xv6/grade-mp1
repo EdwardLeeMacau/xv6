@@ -84,6 +84,17 @@ def test_thread_0():
 	'exited'
     )
 
+@test(1, "thread package with public testcase part1-2")
+def test_thread_0():
+    r.run_qemu(shell_script([
+        'mp1-part1-2',
+	]))
+    r.match(
+    'mp1-part1-2',
+	'',
+	'exited'
+    )
+
 @test(5, "thread package with public testcase part2-0")
 def test_thread_0():
     r.run_qemu(shell_script([
