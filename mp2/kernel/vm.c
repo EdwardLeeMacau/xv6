@@ -48,7 +48,7 @@ kvmmake(void)
 
   // map kernel stacks
   proc_mapstacks(kpgtbl);
-  
+
   return kpgtbl;
 }
 
@@ -145,7 +145,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 
   if(size == 0)
     panic("mappages: size");
-  
+
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
@@ -177,8 +177,9 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+    if((*pte & PTE_V) == 0){ // pages claimed but not allocated.
+      *pte = 0; continue;
+    }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -336,7 +337,7 @@ void
 uvmclear(pagetable_t pagetable, uint64 va)
 {
   pte_t *pte;
-  
+
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     panic("uvmclear");
@@ -436,11 +437,91 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-/* NTU OS 2022 */
-/* Print multi layer page table. */
-void vmprint(pagetable_t pagetable) {
-  /* TODO */
-  panic("not implemented yet\n");
+static void write_flag(char *buf, pte_t pte)
+{
+  char *p = buf;
+
+  if (pte & PTE_V) { *p++ = ' '; *p++ = 'V'; }
+  if (pte & PTE_R) { *p++ = ' '; *p++ = 'R'; }
+  if (pte & PTE_W) { *p++ = ' '; *p++ = 'W'; }
+  if (pte & PTE_X) { *p++ = ' '; *p++ = 'X'; }
+  if (pte & PTE_U) { *p++ = ' '; *p++ = 'U'; }
+  *p = '\0';
+  return;
+}
+
+// defined in string.c
+extern void* memcpy(void *dst, const void *src, uint n);
+
+static inline pte_t *
+_find_next(pte_t *arr, uint64 len)
+{
+  pte_t *pte = arr;
+
+  for (; len; pte++, len--) {
+    if (*pte & PTE_V) {
+      return pte;
+    }
+  }
+
+  return 0;
+}
+
+static void
+_vmprint(pagetable_t pagetable, uint64 va, int level, const char *p)
+{
+  char str[16] = "\0";
+  char *c;
+  uint64 i, pa;
+
+  // 512 PTEs
+  pte_t *next = _find_next((pte_t *)pagetable, 512);
+  pte_t *curr = 0;
+  uint64 rem = 512 - (next - (pte_t *)pagetable);
+
+  while (next) {
+    curr = next;
+
+    next = _find_next((pte_t *)curr + 1, rem - 1);
+    rem -= next - curr;
+
+    i = (curr - (pte_t *)pagetable);
+    pa = PTE2PA(*curr);
+
+    write_flag(str, *curr);
+    printf(
+      "%s+-- %d: pte=%p va=%p pa=%p%s\n",
+      p, i, curr, va + (i << PXSHIFT(level)), pa, str
+    );
+
+    if (level) {
+      c = str;
+
+      memcpy(c, p, strlen(p));
+      memcpy(c + strlen(p), (next) ? "|   ": "    ", 4);
+
+      _vmprint((pagetable_t)pa, va + (i << PXSHIFT(level)), level - 1, str);
+    }
+  }
+
+  return;
+}
+
+/** Print multi layer page table. */
+// To under how process is initialized, you should track from uvmcreate()
+// and uvminit().
+//
+// Inside uvmcreate(), kalloc() returns a page in physical addr as pagetable
+// for process.
+//
+// Then uvminit() is invoked, it allocates an extra page to store user initcode,
+// it's mapping relation is bookmarked via mappages(), also walk() is introduced.
+// Given pagetable, walk() helps mapping virtual addr to physical addr.
+void vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", pagetable);
+  _vmprint(pagetable, 0, 2, "\0");
+  return;
 }
 
 /* NTU OS 2022 */

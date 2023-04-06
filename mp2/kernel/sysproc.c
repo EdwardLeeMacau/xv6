@@ -42,14 +42,22 @@ uint64
 sys_sbrk(void)
 {
   int addr;
+  int sz;
   int n;
 
   if(argint(0, &n) < 0)
     return -1;
-  
-  addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+
+  // lazy allocation, handle memory allocation in access time.
+  struct proc *proc = myproc();
+  addr = proc->sz;
+  sz = proc->sz + n;
+
+  if(n < 0)
+    uvmunmap(proc->pagetable, PGROUNDUP(sz), (PGROUNDUP(addr) - PGROUNDUP(sz)) / PGSIZE, 1);
+
+  proc->sz = sz;
+
   return addr;
 }
 
