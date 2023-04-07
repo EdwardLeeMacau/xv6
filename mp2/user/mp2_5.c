@@ -29,5 +29,15 @@ int main(int argc, char *argv[]) {
   vmprint();
   printf("\n");
 
+  /* Trigger page fault for swapped page */
+  if (*page2 != 1) {
+    printf("error: data integrity test failed\n");
+    exit(1);
+  }
+
+  printf("# After page fault (2)\n");
+  vmprint();
+  printf("\n");
+
   exit(0);
 }

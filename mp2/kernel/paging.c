@@ -14,19 +14,28 @@ int handle_pgfault() {
   // In handle_pgfault(), call uint64 va = r_stval() to find the offending virtual address,
   // and round the address to page boundary using PGROUNDDOWN().
   pagetable_t pagetable = myproc()->pagetable;
-  uint64 va = r_stval();
+  uint64 pa, va = r_stval();
   uint64 a = PGROUNDDOWN(va);
+  uint blk;
 
   // probably the page is valid but swapped out.
-  // TODO: Handle swapped pages
   pte_t *pte = walk(pagetable, a, 1);
   if (*pte & PTE_S) {
-    panic("handle_pgfault: swapped");
+    begin_op();
+
+    pa = (uint64)kalloc(); blk = PTE2BLOCKNO(*pte);
+    read_page_from_disk(ROOTDEV, (char *)pa, blk);
+    bfree_page(ROOTDEV, blk);
+
+    end_op();
+
+    *pte = PA2PTE(pa) | ((PTE_FLAGS(*pte) & ~PTE_S) | PTE_V);
+    return 0;
   }
 
   // Demand paging
   // Always mark PTE_U, PTE_R, PTE_W, PTE_X flags on newly allocated pages.
-  uint64 pa = (uint64)kalloc();
+  pa = (uint64)kalloc();
   int ret = mappages(pagetable, a, PGSIZE, pa, PTE_R | PTE_W | PTE_X | PTE_U);
   if (ret) {
     kfree((void *)pa);

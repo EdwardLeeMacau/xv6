@@ -446,6 +446,7 @@ static void write_flag(char *buf, pte_t pte)
   if (pte & PTE_W) { *p++ = ' '; *p++ = 'W'; }
   if (pte & PTE_X) { *p++ = ' '; *p++ = 'X'; }
   if (pte & PTE_U) { *p++ = ' '; *p++ = 'U'; }
+  if (pte & PTE_S) { *p++ = ' '; *p++ = 'S'; }
   *p = '\0';
   return;
 }
@@ -459,7 +460,7 @@ _find_next(pte_t *arr, uint64 len)
   pte_t *pte = arr;
 
   for (; len; pte++, len--) {
-    if (*pte & PTE_V) {
+    if (*pte & (PTE_V | PTE_S)) {
       return pte;
     }
   }
@@ -490,8 +491,11 @@ _vmprint(pagetable_t pagetable, uint64 va, int level, const char *p)
 
     write_flag(str, *curr);
     printf(
-      "%s+-- %d: pte=%p va=%p pa=%p%s\n",
-      p, i, curr, va + (i << PXSHIFT(level)), pa, str
+      "%s+-- %d: pte=%p va=%p %s=%p%s\n",
+      p, i, curr, va + (i << PXSHIFT(level)),
+      (*curr & PTE_S) ? "blockno" : "pa",
+      (*curr & PTE_S) ? PTE2BLOCKNO(*curr) : pa,
+      str
     );
 
     if (level) {
@@ -526,7 +530,88 @@ void vmprint(pagetable_t pagetable)
 
 /* NTU OS 2022 */
 /* Map pages to physical memory or swap space. */
-int madvise(uint64 base, uint64 len, int advice) {
-  /* TODO */
-  panic("not implemented yet\n");
+// base: virtual address
+int madvise(uint64 base, uint64 len, int advice)
+{
+  struct proc *proc = myproc();
+  pagetable_t pagetable;
+
+  uint64 a, pa, va = PGROUNDDOWN(base);
+  uint npages = (PGROUNDUP(base + len) - va) / PGSIZE;
+  pte_t *pte;
+  uint blk;
+  int ret;
+
+  if (base + len > proc->sz) {
+    return -1;
+  }
+
+  pagetable = proc->pagetable;
+
+  switch (advice) {
+  case MADV_NORMAL:
+    break;
+
+  case MADV_DONTNEED:
+    // Swap out memory to disk
+    for(a = va; a < va + npages * PGSIZE; a += PGSIZE){
+      pte = walk(pagetable, a, 0);
+      if (!(*pte & PTE_V)) {
+        // Skip claimed but not allocated page. No need to be swapped out.
+        continue;
+      }
+      pa = PTE2PA(*pte);
+
+      // Swap out single page. See 7.4 Notes on Device I/O
+      begin_op();
+
+      blk = balloc_page(ROOTDEV);
+      write_page_to_disk(ROOTDEV, (char *)pa, blk);
+      kfree((void *)pa);
+
+      end_op();
+
+      // Bookmarking.
+      // Record block number instead physical addr. Also modify flag.
+      *pte = BLOCKNO2PTE(blk) | ((PTE_FLAGS(*pte) & ~PTE_V) | PTE_S);
+    }
+    break;
+
+  case MADV_WILLNEED:
+    // Swap in memory from disk
+    for(a = va; a < va + npages * PGSIZE; a += PGSIZE){
+      pte = walk(pagetable, a, 0);
+      if (*pte & PTE_V) {
+        // Skip pages already in memory.
+        continue;
+      }
+
+      if (*pte & PTE_S) {
+        begin_op();
+
+        pa = (uint64)kalloc(); blk = PTE2BLOCKNO(*pte);
+        read_page_from_disk(ROOTDEV, (char *)pa, blk);
+        bfree_page(ROOTDEV, blk);
+
+        end_op();
+
+        *pte = PA2PTE(pa) | ((PTE_FLAGS(*pte) & ~PTE_S) | PTE_V);
+      } else {
+        // Claim on-demand pages.
+        pa = (uint64)kalloc();
+        ret = mappages(pagetable, a, PGSIZE, pa, PTE_R | PTE_W | PTE_X | PTE_U);
+        if (ret) {
+          kfree((void *)pa);
+          continue;
+        }
+        memset((void *)pa, 0, PGSIZE);
+      }
+    }
+    break;
+
+  default:
+    panic("madvice: unknown option");
+  }
+
+  return 0;
 }
