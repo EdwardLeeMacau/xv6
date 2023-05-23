@@ -28,7 +28,7 @@ trapinithart(void)
 {
   w_stvec((uint64)kernelvec);
 }
- 
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -46,10 +46,10 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
   if(r_scause() == 8){
     // system call
 
@@ -78,8 +78,20 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2){
-    //TODO: mp3
+    // cannot check whether handler is registered using fn == 0, because
+    // function address might be 0x0...
+    // uint64 fn = p->thrdstop_handler;
 
+    // if deadline is not arrived, do nothing
+    if (p->handler_state != SLEEPING || p->deadline_ticks != ticks) {
+      goto yield;
+    }
+
+    // toggle the handler state in usertrapret()
+    p->handler_state = RUNNABLE;
+    memmove(p->thrdstop_trapframe, p->trapframe, sizeof(*p->trapframe));
+
+yield:
     yield();
   }
   usertrapret();
@@ -108,11 +120,18 @@ usertrapret(void)
   p->trapframe->kernel_trap = (uint64)usertrap;
   p->trapframe->kernel_hartid = r_tp();         // hartid for cpuid()
 
+  // pass thrdstop handler and its argument to trapframe, such that
+  // usertrapret() can set them to program counter.
+  if (p->handler_state == RUNNABLE) {
+    p->trapframe->epc = p->handler;
+    p->trapframe->a0 = p->handler_arg;
 
+    p->handler_state = UNUSED;
+  }
 
   // set up the registers that trampoline.S's sret will use
   // to get to user space.
-  
+
   // set S Previous Privilege mode to User.
   unsigned long x = r_sstatus();
   x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
@@ -124,24 +143,24 @@ usertrapret(void)
 
   // tell trampoline.S the user page table to switch to.
   uint64 satp = MAKE_SATP(p->pagetable);
-  // jump to trampoline.S at the top of memory, which 
+  // jump to trampoline.S at the top of memory, which
   // switches to the user page table, restores user registers,
   // and switches to user mode with sret.
   uint64 fn = TRAMPOLINE + (userret - trampoline);
-  
+
   ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
 }
 
 // interrupts and exceptions from kernel code go here via kernelvec,
 // on whatever the current kernel stack is.
-void 
+void
 kerneltrap()
 {
   int which_dev = 0;
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
-  
+
   if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
   if(intr_get() != 0)
@@ -155,7 +174,17 @@ kerneltrap()
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING){
-    //TODO: mp3
+    struct proc *p = myproc();
+
+    // if deadline is not arrived, do nothing
+    if (p->handler_state != SLEEPING || p->deadline_ticks != ticks) {
+      goto yield;
+    }
+
+    p->handler_state = RUNNABLE;
+    memmove(p->thrdstop_trapframe, p->trapframe, sizeof(*p->trapframe));
+
+yield:
     yield();
   }
 
@@ -163,7 +192,6 @@ kerneltrap()
   // so restore trap registers for use by kernelvec.S's sepc instruction.
   w_sepc(sepc);
   w_sstatus(sstatus);
-
 }
 
 void
@@ -214,7 +242,7 @@ devintr()
     if(cpuid() == 0){
       clockintr();
     }
-    
+
     // acknowledge the software interrupt by clearing
     // the SSIP bit in sip.
     w_sip(r_sip() & ~2);

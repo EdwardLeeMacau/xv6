@@ -49,6 +49,17 @@ def test_uthread():
     if not re.findall("\[OK\] test_multi_context", r.qemu.output, re.M):
         raise AssertionError('Output does not match expected output')
 
+@test(1, "thrdtest5")
+def test_uthread():
+    global passTestNum
+    r.run_qemu(shell_script([
+        'thrdtest5'
+    ]), make_args = ["SCHEDPOLICY=THREAD_SCHEDULER_DEFAULT"])
+
+    expected = """10
+3"""
+    if not re.findall(expected, r.qemu.output, re.M):
+        raise AssertionError('Output does not match expected output')
 
 run_tests()
 

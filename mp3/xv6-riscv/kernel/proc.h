@@ -101,6 +101,18 @@ struct proc {
   int pid;                     // Process ID
 
   //TODO: mp3
+  uint64 handler;
+  uint64 handler_arg;          // address in virtual memory space
+  enum procstate handler_state;// whether a handler is set
+  struct trapframe thrdstop_ctx[MAX_THRD_NUM];
+                               // buffer to store the context, such that user can
+                               // jump back to specific context
+  struct trapframe *thrdstop_trapframe;
+                               // current in-used trapframe
+  int thrdstop_used[MAX_THRD_NUM];
+                               // to record which context block is allocated.
+  uint start_ticks;            // start tick of current handler
+  uint deadline_ticks;         // expected deadline tick to current handler
 
   // these are private to the process, so p->lock need not be held.
   uint64 kstack;               // Virtual address of kernel stack
