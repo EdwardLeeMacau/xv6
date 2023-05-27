@@ -24,7 +24,7 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 // there should be one superblock per disk device, but we run with
 // only one device
-struct superblock sb; 
+struct superblock sb;
 
 // Read the super block.
 static void
@@ -180,7 +180,7 @@ void
 iinit()
 {
   int i = 0;
-  
+
   initlock(&itable.lock, "itable");
   for(i = 0; i < NINODE; i++) {
     initsleeplock(&itable.inode[i].lock, "inode");
@@ -377,12 +377,11 @@ iunlockput(struct inode *ip)
 static uint
 bmap(struct inode *ip, uint bn)
 {
-  // TODO: Large Files
-  // You should modify bmap(),
-  // so that it can handle doubly indrect inode.
   uint addr, *a;
+  uint div, quot, rem;
   struct buf *bp;
 
+  // handle first 10 directed blocks
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
@@ -390,17 +389,51 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
-  if(bn < NINDIRECT){
+  // handle 1 singly-indirected blocks
+  if(bn < BLOCKSPAN){
+    rem = bn % BLOCKSPAN;
+
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
-    if((addr = a[bn]) == 0){
-      a[bn] = addr = balloc(ip->dev);
+    if((addr = a[rem]) == 0){
+      a[rem] = addr = balloc(ip->dev);
       log_write(bp);
     }
     brelse(bp);
+    return addr;
+  }
+  bn -= BLOCKSPAN;
+
+  // handle 2 doubly-indirected block
+  if (bn < 2 * BLOCKSPAN * BLOCKSPAN){
+    div = BLOCKSPAN * BLOCKSPAN;
+    quot = bn / div;
+    rem = bn - quot * div;
+
+    // Load 1st level indirect block, allocating if necessary.
+    if((addr = ip->addrs[NDIRECT+1+quot]) == 0)
+      ip->addrs[NDIRECT+1+quot] = addr = balloc(ip->dev);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    div = BLOCKSPAN; quot = rem / div; rem = rem % div;
+    if((addr = a[quot]) == 0){
+      a[quot] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    // Load 2nd level indirect block, allocating if necessary.
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[rem]) == 0){
+      a[rem] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
     return addr;
   }
 
@@ -412,13 +445,11 @@ bmap(struct inode *ip, uint bn)
 void
 itrunc(struct inode *ip)
 {
-  // TODO: Large Files
-  // You should modify itruc(),
-  // so that it can handle doubly indrect inode.
-  int i, j;
-  struct buf *bp;
-  uint *a;
+  int i, j, k;
+  struct buf *bp, *bp2;
+  uint addr, *a, *a2;
 
+  // handle first 10 directed blocks
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
       bfree(ip->dev, ip->addrs[i]);
@@ -426,16 +457,41 @@ itrunc(struct inode *ip)
     }
   }
 
+  // handle 1 singly-indirected blocks
   if(ip->addrs[NDIRECT]){
     bp = bread(ip->dev, ip->addrs[NDIRECT]);
     a = (uint*)bp->data;
-    for(j = 0; j < NINDIRECT; j++){
+    for(j = 0; j < BLOCKSPAN; j++){
       if(a[j])
         bfree(ip->dev, a[j]);
     }
     brelse(bp);
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
+  }
+
+  // handle 2 doubly-indirected blocks
+  for (k = 0; k < 2; k++){
+    if((addr = ip->addrs[NDIRECT+1+k]) == 0)
+      continue;
+
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    for(i = 0; i < BLOCKSPAN; i++){
+      if(a[i]){
+        bp2 = bread(ip->dev, a[i]);
+        a2 = (uint*)bp2->data;
+        for(j = 0; j < BLOCKSPAN; j++){
+          if(a2[j])
+            bfree(ip->dev, a2[j]);
+        }
+        brelse(bp2);
+        bfree(ip->dev, a[i]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, addr);
+    ip->addrs[NDIRECT+1+k] = 0;
   }
 
   ip->size = 0;
@@ -637,7 +693,7 @@ namex(char *path, int nameiparent, char *name)
   // TODO: Symbolic Link to Directories
   // Modify this function to deal with symbolic links to directories.
   struct inode *ip, *next;
-  
+
   if(*path == '/')
     ip = iget(ROOTDEV, ROOTINO);
   else

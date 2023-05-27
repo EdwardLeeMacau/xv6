@@ -43,7 +43,7 @@ done:
   unlink("big.file");
 }
 
-static void 
+static void
 public2()
 {
   char buf[BSIZE];
@@ -78,11 +78,46 @@ done:
   unlink("big.file");
 }
 
+static void
+public3()
+{
+  char buf[BSIZE];
+  int fd, blocks;
+  int target = 66666;
+
+  fd = open("big.file", O_CREATE | O_WRONLY);
+  if(fd < 0){
+    fail("bigfile: cannot open big.file for writing\n");
+  }
+
+  blocks = 0;
+  while(1){
+    *(int*)buf = blocks;
+    int cc = write(fd, buf, sizeof(buf));
+    if(cc <= 0)
+      break;
+    blocks++;
+    if (blocks % 100 == 0)
+      printf(".");
+    if(blocks == target)
+      break;
+  }
+  printf("\nwrote %d blocks\n", blocks);
+  if(blocks != target) {
+    fail("bigfile: file is too small\n");
+  }
+  printf("public testcase 3: ok\n");
+
+done:
+  close(fd);
+  unlink("big.file");
+}
 
 int
 main()
 {
   public1();
   public2();
+  public3();
   exit(failed);
 }
