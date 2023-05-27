@@ -286,16 +286,10 @@ create(char *path, short type, short major, short minor)
 uint64
 sys_open(void)
 {
-  // TODO: Symbolic links to Files
-  // open() should handle symbolic link
-  // If the file is a symbolic link, and O_NOFOLLOW is not specified,
-  // then you should read the path in the symbolic link,
-  // and return the corresponding file.
-
-  char path[MAXPATH];
+  char path[MAXPATH], target[MAXPATH];
   int fd, omode;
   struct file *f;
-  struct inode *ip;
+  struct inode *ip, *next;
   int n;
 
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
@@ -320,6 +314,15 @@ sys_open(void)
       end_op();
       return -1;
     }
+  }
+
+  // recursively resolve symbolic link until it is not a symbolic link
+  // TODO: add a max depth to prevent infinite loop
+  while(ip->type == T_SYMLINK && omode != O_NOFOLLOW){
+    readi(ip, 0, (uint64)target, 0, MAXPATH);
+    next = namei(target);
+
+    ilock(next); iunlock(ip); ip = next;
   }
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
@@ -403,7 +406,7 @@ sys_chdir(void)
   char path[MAXPATH];
   struct inode *ip;
   struct proc *p = myproc();
-  
+
   begin_op();
   if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == 0){
     end_op();
@@ -500,13 +503,43 @@ sys_symlink(void)
 {
   // TODO: symbolic link
   // You should implement this symlink system call.
-  // char target[MAXPATH], path[MAXPATH];
-  // struct inode *ip;
+  char target[MAXPATH], path[MAXPATH];
+  int fd, n;
+  struct file *f;
+  struct inode *ip;
 
-  // if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
-  //   return -1;
-  
-  panic("You should implement symlink system call.");
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  // mimic sys_open
+  begin_op();
+
+  // when inode is create from API() create, it is already locked
+  if((ip = create(path, T_SYMLINK, 0, 0)) == 0){
+    end_op();
+    return -1;
+  }
+
+  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+    if(f)
+      fileclose(f);
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  f->type = FD_INODE;
+  f->off = 0;
+  f->ip = ip;
+  f->readable = 1;
+  f->writable = 1;
+
+  n = strlen(target);
+  if(writei(ip, 0, (uint64)target, 0, n) != n)
+    panic("symlink: writei");
+
+  iunlockput(ip);
+  end_op();
 
   return 0;
 }
