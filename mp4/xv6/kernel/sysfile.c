@@ -289,7 +289,7 @@ sys_open(void)
   char path[MAXPATH], target[MAXPATH];
   int fd, omode;
   struct file *f;
-  struct inode *ip, *next;
+  struct inode *ip;
   int n;
 
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
@@ -318,11 +318,22 @@ sys_open(void)
 
   // recursively resolve symbolic link until it is not a symbolic link
   // TODO: add a max depth to prevent infinite loop
-  while(ip->type == T_SYMLINK && omode != O_NOFOLLOW){
-    readi(ip, 0, (uint64)target, 0, MAXPATH);
-    next = namei(target);
+  while(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+    if (readi(ip, 0, (uint64)target, 0, MAXPATH) < 0) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
 
-    ilock(next); iunlock(ip); ip = next;
+    // close previous
+    iunlockput(ip);
+
+    // open next inode
+    if ((ip = namei(target)) == 0) {
+      end_op();
+      return -1;
+    }
+    ilock(ip);
   }
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
@@ -403,7 +414,7 @@ sys_chdir(void)
   // You can modify this to cd into a symbolic link
   // The modification may not be necessary,
   // depending on you implementation.
-  char path[MAXPATH];
+  char path[MAXPATH], target[MAXPATH];
   struct inode *ip;
   struct proc *p = myproc();
 
@@ -413,11 +424,33 @@ sys_chdir(void)
     return -1;
   }
   ilock(ip);
+
+  // symbolic link to dir
+  while(ip->type == T_SYMLINK) {
+    if (readi(ip, 0, (uint64)target, 0, MAXPATH) < 0) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+
+    // close previous
+    iunlockput(ip);
+
+    // open next inode
+    if ((ip = namei(target)) == 0) {
+      end_op();
+      return -1;
+    }
+    ilock(ip);
+  }
+
+
   if(ip->type != T_DIR){
     iunlockput(ip);
     end_op();
     return -1;
   }
+
   iunlock(ip);
   iput(p->cwd);
   end_op();
@@ -501,8 +534,6 @@ sys_pipe(void)
 uint64
 sys_symlink(void)
 {
-  // TODO: symbolic link
-  // You should implement this symlink system call.
   char target[MAXPATH], path[MAXPATH];
   int fd, n;
   struct file *f;

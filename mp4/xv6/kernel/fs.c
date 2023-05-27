@@ -683,6 +683,22 @@ skipelem(char *path, char *name)
   return path;
 }
 
+static struct inode*
+resolve(struct inode* ip)
+{
+  char buf[MAXPATH];
+  while(ip->type == T_SYMLINK){
+    if (readi(ip, 0, (uint64)buf, 0, sizeof(buf)) < 0) {
+      return 0;
+    }
+
+    iunlockput(ip);
+    ip = namei(buf);
+    ilock(ip);
+  }
+  return ip;
+}
+
 // Look up and return the inode for a path name.
 // If parent != 0, return the inode for the parent and copy the final
 // path element into name, which must have room for DIRSIZ bytes.
@@ -699,8 +715,10 @@ namex(char *path, int nameiparent, char *name)
   else
     ip = idup(myproc()->cwd);
 
+  // routine returns inode* for target file or directory "path".
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
+    ip = resolve(ip);
     if(ip->type != T_DIR){
       iunlockput(ip);
       return 0;
@@ -717,6 +735,7 @@ namex(char *path, int nameiparent, char *name)
     iunlockput(ip);
     ip = next;
   }
+
   if(nameiparent){
     iput(ip);
     return 0;
