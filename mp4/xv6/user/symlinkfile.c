@@ -15,6 +15,7 @@ static int failed = 0;
 static void public1(void);
 static void public2(void);
 static void public3(void);
+static void public4(void);
 static void cleanup(void);
 
 int
@@ -29,6 +30,9 @@ main(int argc, char *argv[])
   cleanup();
 
   public3();
+  cleanup();
+
+  public4();
   cleanup();
 
   exit(failed);
@@ -151,7 +155,6 @@ done:
   close(fd2);
 }
 
-
 // detect cycles in symbolic link chains
 static void
 public3(void)
@@ -177,6 +180,41 @@ public3(void)
   if(fd1!=-1) fail("Opened a symlink cycle\n");
 
   printf("public testcase 3: ok\n");
+
+done:
+  return;
+}
+
+// open a symbolic link points to non-exist file
+static void
+public4(void)
+{
+  int r, fd1 = -1;
+  char buf[32];
+
+  printf("public testcase 4:\n");
+
+  mkdir("/testsymlink");
+
+  // 1. Create a symlink chain 1 -> 2
+  r = symlink("/testsymlink/2", "/testsymlink/1");
+  if(r) fail("Failed to link 1->2");
+
+  // 2. Open 1, expect failure.
+  fd1 = open("/testsymlink/1", O_RDWR);
+  if(fd1!=-1) fail("Opened a dangling symbolic link\n");
+
+  // 3. Open 1 with O_NOFOLLOW, expect success, verify content
+  fd1 = open("/testsymlink/1", O_RDONLY | O_NOFOLLOW);
+  if(fd1<0) fail("Failed to open 1 with O_NOFOLLOW\n");
+
+  r = read(fd1, buf, sizeof(buf));
+  if(r<0) fail("Failed to read from 1\n");
+
+  r = strcmp(buf, "/testsymlink/2");
+  if(r) fail("Read unexpected content from 1\n");
+
+  printf("public testcase 4: ok\n");
 
 done:
   return;

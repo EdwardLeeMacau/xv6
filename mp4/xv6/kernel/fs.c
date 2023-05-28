@@ -687,15 +687,27 @@ static struct inode*
 resolve(struct inode* ip)
 {
   char buf[MAXPATH];
+  int rem = 20;            // remain budget to deference symbolic link
+
   while(ip->type == T_SYMLINK){
+    if (!rem) {
+      iunlockput(ip);
+      return 0;           // approx cyclic
+    }
+
     if (readi(ip, 0, (uint64)buf, 0, sizeof(buf)) < 0) {
-      return 0;
+      iunlockput(ip);
+      return 0;           // read failure
     }
 
     iunlockput(ip);
     ip = namei(buf);
+    if(!ip) return 0;     // dangling
     ilock(ip);
+
+    rem--;
   }
+
   return ip;
 }
 
@@ -716,7 +728,10 @@ namex(char *path, int nameiparent, char *name)
   // routine returns inode* for target file or directory "path".
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
+
     ip = resolve(ip);
+    if(!ip) return 0; // dangling, cyclic or read failure
+
     if(ip->type != T_DIR){
       iunlockput(ip);
       return 0;

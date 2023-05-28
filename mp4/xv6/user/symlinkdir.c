@@ -124,6 +124,7 @@ public4()
     fail("symlink /testsymlink2/p -> /testsymlink2 failed");
 
   // create a file in the directory and write a token to it
+  // FIXME:
   fd1 = open("/testsymlink2/p/q", O_CREATE | O_RDWR);
   if(fd1 < 0) fail("failed to open /testsymlink2/p/q");
 
