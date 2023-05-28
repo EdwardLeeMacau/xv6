@@ -706,8 +706,6 @@ resolve(struct inode* ip)
 static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
-  // TODO: Symbolic Link to Directories
-  // Modify this function to deal with symbolic links to directories.
   struct inode *ip, *next;
 
   if(*path == '/')

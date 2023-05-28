@@ -288,6 +288,7 @@ sys_open(void)
 {
   char path[MAXPATH], target[MAXPATH];
   int fd, omode;
+  int rem = 20;            // remain budget to deference symbolic link
   struct file *f;
   struct inode *ip;
   int n;
@@ -317,8 +318,14 @@ sys_open(void)
   }
 
   // recursively resolve symbolic link until it is not a symbolic link
-  // TODO: add a max depth to prevent infinite loop
   while(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+    if (!rem) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+
+    // read target path from inode
     if (readi(ip, 0, (uint64)target, 0, MAXPATH) < 0) {
       iunlockput(ip);
       end_op();
@@ -334,6 +341,8 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
+
+    rem--;
   }
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
@@ -410,11 +419,8 @@ sys_mknod(void)
 uint64
 sys_chdir(void)
 {
-  // TODO: Symbolic Link to Directories
-  // You can modify this to cd into a symbolic link
-  // The modification may not be necessary,
-  // depending on you implementation.
   char path[MAXPATH], target[MAXPATH];
+  int rem = 20;            // remain budget to deference symbolic link
   struct inode *ip;
   struct proc *p = myproc();
 
@@ -427,6 +433,13 @@ sys_chdir(void)
 
   // symbolic link to dir
   while(ip->type == T_SYMLINK) {
+    if (!rem) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+
+    // read target path from inode
     if (readi(ip, 0, (uint64)target, 0, MAXPATH) < 0) {
       iunlockput(ip);
       end_op();
@@ -442,6 +455,8 @@ sys_chdir(void)
       return -1;
     }
     ilock(ip);
+
+    rem--;
   }
 
 

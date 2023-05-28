@@ -24,7 +24,6 @@ struct superblock {
 
 #define FSMAGIC 0x10203040
 
-// TODO: bigfile
 // You may need to modify these.
 #define NDIRECT 10
 #define BLOCKSPAN (BSIZE / sizeof(uint))                // 256, number of addr entries can be stored

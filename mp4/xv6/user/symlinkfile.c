@@ -14,16 +14,23 @@ static int failed = 0;
 
 static void public1(void);
 static void public2(void);
+static void public3(void);
 static void cleanup(void);
 
 int
 main(int argc, char *argv[])
 {
   cleanup();
+
   public1();
   cleanup();
+
   public2();
   cleanup();
+
+  public3();
+  cleanup();
+
   exit(failed);
 }
 
@@ -65,7 +72,7 @@ public1(void)
   char buf[4] = {'a', 'b', 'c', 'd'};
   char c = 0;
   struct stat st;
-    
+
   printf("public testcase 1:\n");
 
   mkdir("/testsymlink");
@@ -109,7 +116,7 @@ public2(void)
 {
   int r, fd1 = -1, fd2 = -1;
   char c = 0, c2 = 0;
-    
+
   printf("public testcase 2:\n");
 
   mkdir("/testsymlink");
@@ -142,4 +149,35 @@ public2(void)
 done:
   close(fd1);
   close(fd2);
+}
+
+
+// detect cycles in symbolic link chains
+static void
+public3(void)
+{
+  int r, fd1 = -1;
+
+  printf("public testcase 3:\n");
+
+  mkdir("/testsymlink");
+
+  // 1. Create a symlink chain 1 -> 2 -> 3 -> 4 -> 1
+  r = symlink("/testsymlink/2", "/testsymlink/1");
+  if(r) fail("Failed to link 1->2");
+  r = symlink("/testsymlink/3", "/testsymlink/2");
+  if(r) fail("Failed to link 2->3");
+  r = symlink("/testsymlink/4", "/testsymlink/3");
+  if(r) fail("Failed to link 3->4");
+  r = symlink("/testsymlink/1", "/testsymlink/4");
+  if(r) fail("Failed to link 4->1");
+
+  // 2. Open 1, expect failure.
+  fd1 = open("/testsymlink/1", O_RDWR);
+  if(fd1!=-1) fail("Opened a symlink cycle\n");
+
+  printf("public testcase 3: ok\n");
+
+done:
+  return;
 }
