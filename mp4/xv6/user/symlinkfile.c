@@ -16,6 +16,7 @@ static void public1(void);
 static void public2(void);
 static void public3(void);
 static void public4(void);
+static void public5(void);
 static void cleanup(void);
 
 int
@@ -33,6 +34,9 @@ main(int argc, char *argv[])
   cleanup();
 
   public4();
+  cleanup();
+
+  public5();
   cleanup();
 
   exit(failed);
@@ -215,6 +219,23 @@ public4(void)
   if(r) fail("Read unexpected content from 1\n");
 
   printf("public testcase 4: ok\n");
+
+done:
+  return;
+}
+
+// create a symbolic link given invalid path
+static void
+public5(void)
+{
+  int r;
+
+  printf("public testcase 5:\n");
+
+  r = symlink("/whatever", "/testsymlink/1");
+  if(!r) fail("Created a symbolic link with invalid path\n");
+
+  printf("public testcase 5: ok\n");
 
 done:
   return;
